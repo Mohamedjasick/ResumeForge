@@ -1,0 +1,51 @@
+/* ── ResumeForge Theme Variables ── */
+/* Plain CSS — bypasses sucrase entirely */
+
+:root,
+[data-theme="dark"] {
+  --card-bg: #111118;
+  --card-border: #40404c;
+  --btn-secondary-bg: #40404c;
+  --btn-secondary-hover: #4b4b59;
+  --btn-secondary-border: #4b4b59;
+  --btn-secondary-text: #d8d8de;
+  --input-bg: #383843;
+  --input-border: #4b4b59;
+  --input-text: #ededf0;
+  --input-placeholder: #717183;
+  --label-text: #b6b6c1;
+  --page-title: #ffffff;
+  --page-bg: #0f0f17;
+  --section-title: #ededf0;
+  --stat-value: #ffffff;
+  --rf-text: #d8d8de;
+  --rf-text-muted: #8888a0;
+  --sidebar-bg: #0d0d14;
+  --shimmer-from: #1a1a28;
+  --shimmer-mid: #23233a;
+  --scrollbar-track: #1a1a28;
+}
+
+[data-theme="warm"] {
+  --card-bg: #fffdf8;
+  --card-border: #ddd4c5;
+  --btn-secondary-bg: #ede5d8;
+  --btn-secondary-hover: #ddd4c5;
+  --btn-secondary-border: #cec3b5;
+  --btn-secondary-text: #3d2b1a;
+  --input-bg: #fbf8f4;
+  --input-border: #cec3b5;
+  --input-text: #2e1f0f;
+  --input-placeholder: #9e8776;
+  --label-text: #4a3020;
+  --page-title: #1a0f00;
+  --page-bg: #e8e0d0;
+  --section-title: #2e1f0f;
+  --stat-value: #1a0f00;
+  --rf-text: #2e1f0f;
+  --rf-text-muted: #5a4030;
+  --sidebar-bg: #f0ebe0;
+  --shimmer-from: #ede5d8;
+  --shimmer-mid: #f2ede4;
+  --scrollbar-track: #ede5d8;
+}
