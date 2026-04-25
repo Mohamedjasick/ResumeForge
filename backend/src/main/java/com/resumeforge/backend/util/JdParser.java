@@ -50,10 +50,10 @@ public class JdParser {
         "mongo",
 
         // ── Cloud platforms ───────────────────────────────────────────────────
+        // Top-level providers only — sub-services like ec2, s3, eks, rds etc.
+        // removed to avoid redundant missing skill flags alongside AWS/GCP.
         "aws", "gcp", "azure",
-        "ec2", "s3", "lambda", "rds", "sqs", "sns", "cloudfront",
-        "eks", "ecs", "fargate", "beanstalk",
-        "gke", "bigquery", "pubsub",
+        "lambda", "bigquery",
 
         // ── DevOps / Infrastructure ───────────────────────────────────────────
         "docker", "kubernetes", "k8s", "terraform", "ansible", "puppet",

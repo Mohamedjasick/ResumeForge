@@ -10,7 +10,7 @@ const Icon = ({ d, size = 18 }) => (
   </svg>
 );
 const UserIcon    = () => <Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />;
-const LockIcon    = () => <Icon d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4" />;
+const LockIcon    = () => <Icon d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4" />;
 const PaletteIcon = () => <Icon d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h4M18 12h4M12 2v4M12 18v4" />;
 const BellIcon    = () => <Icon d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />;
 const TypeIcon    = () => <Icon d="M4 7V4h16v3M9 20h6M12 4v16" />;
@@ -47,13 +47,15 @@ const DARK = {
 function getPalette(theme) {
   if (theme === "dark") return DARK;
   if (theme === "warm") return WARM;
-  // system — detect OS preference
   if (typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches) return DARK;
   return WARM;
 }
 
-// ── sub-components (all accept `s` = styles/palette) ─────────────────────────
+// ── localStorage key for font preference ─────────────────────────────────────
+const FONT_KEY = "rf_resume_font";
+
+// ── sub-components ────────────────────────────────────────────────────────────
 const Section = ({ icon, title, children, s }) => (
   <div style={{ background: s.cardBg, border: `1px solid ${s.cardBorder}`,
     borderRadius: 16, padding: "1.75rem 2rem", marginBottom: "1.25rem" }}>
@@ -147,20 +149,25 @@ const FontCard = ({ name, sample, value, current, onSelect, s }) => {
   );
 };
 
+// ── font list — value is the key sent to backend ──────────────────────────────
+const FONTS = [
+  { name: "Georgia",           value: "georgia",           cssFamily: "'Georgia', serif",           sample: "Aa — Classic Resume"   },
+  { name: "Playfair",          value: "playfair",          cssFamily: "'Playfair Display', serif",  sample: "Aa — Elegant Resume"   },
+  { name: "Lato",              value: "lato",              cssFamily: "'Lato', sans-serif",         sample: "Aa — Clean Resume"     },
+  { name: "Merriweather",      value: "merriweather",      cssFamily: "'Merriweather', serif",      sample: "Aa — Editorial Resume" },
+  { name: "Nunito",            value: "nunito",            cssFamily: "'Nunito', sans-serif",       sample: "Aa — Modern Resume"    },
+  { name: "Libre Baskerville", value: "libre_baskerville", cssFamily: "'Libre Baskerville', serif", sample: "Aa — Professional"     },
+];
+
 // ── main component ────────────────────────────────────────────────────────────
 export default function Settings() {
   const { addToast } = useToast();
   const { theme, setTheme } = useTheme();
 
-  // derive palette reactively
   const [s, setS] = useState(() => getPalette(theme));
 
-  // re-derive when theme changes
-  useEffect(() => {
-    setS(getPalette(theme));
-  }, [theme]);
+  useEffect(() => { setS(getPalette(theme)); }, [theme]);
 
-  // live-update when OS dark/light preference changes (system theme)
   useEffect(() => {
     if (theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -173,11 +180,22 @@ export default function Settings() {
   const [currentPwd, setCurrentPwd]   = useState("");
   const [newPwd, setNewPwd]           = useState("");
   const [confirmPwd, setConfirmPwd]   = useState("");
-  const [font, setFont]               = useState("'Georgia', serif");
   const [deleteInput, setDeleteInput] = useState("");
   const [notifs, setNotifs] = useState({
     resumeReady: true, versionSaved: true, tips: false, weeklyDigest: false,
   });
+
+  // ── Font: load from localStorage on mount, default to georgia ────────────
+  const [font, setFont] = useState(
+    () => localStorage.getItem(FONT_KEY) || "georgia"
+  );
+
+  // ── Save font to localStorage whenever it changes ─────────────────────────
+  const handleFontSelect = (value, name) => {
+    setFont(value);
+    localStorage.setItem(FONT_KEY, value);
+    addToast(`Font set to ${name}. Your next export will use this font.`, "success");
+  };
 
   const handleThemeChange = useCallback((t) => {
     setTheme(t);
@@ -203,14 +221,8 @@ export default function Settings() {
     addToast("Account deletion requested.", "error");
   };
 
-  const fonts = [
-    { name: "Georgia",           value: "'Georgia', serif",           sample: "Aa — Classic Resume"    },
-    { name: "Playfair",          value: "'Playfair Display', serif",  sample: "Aa — Elegant Resume"    },
-    { name: "Lato",              value: "'Lato', sans-serif",         sample: "Aa — Clean Resume"      },
-    { name: "Merriweather",      value: "'Merriweather', serif",      sample: "Aa — Editorial Resume"  },
-    { name: "Nunito",            value: "'Nunito', sans-serif",       sample: "Aa — Modern Resume"     },
-    { name: "Libre Baskerville", value: "'Libre Baskerville', serif", sample: "Aa — Professional"      },
-  ];
+  // current font's cssFamily for preview
+  const currentCssFamily = FONTS.find(f => f.value === font)?.cssFamily || "'Georgia', serif";
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem",
@@ -220,7 +232,6 @@ export default function Settings() {
 
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Lato:wght@400;700&family=Merriweather&family=Nunito&family=Libre+Baskerville&display=swap" rel="stylesheet" />
 
-      {/* page header */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: s.text, marginBottom: 4,
           fontFamily: "'Playfair Display', Georgia, serif" }}>Settings</h1>
@@ -287,15 +298,27 @@ export default function Settings() {
       {/* 5. Font */}
       <Section icon={<TypeIcon />} title="Resume font style" s={s}>
         <p style={{ fontSize: 13, color: s.textMuted, marginBottom: 14 }}>
-          Choose the default font used when your resume is exported.
+          Choose the default font used when your resume is exported as PDF or DOCX.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 10 }}>
-          {fonts.map(f => (
-            <FontCard key={f.value} {...f} current={font} onSelect={v => {
-              setFont(v);
-              addToast(`Font set to ${f.name}.`, "success");
-            }} s={s} />
+          {FONTS.map(f => (
+            <FontCard
+              key={f.value}
+              name={f.name}
+              sample={f.sample}
+              value={f.cssFamily}
+              current={currentCssFamily}
+              onSelect={() => handleFontSelect(f.value, f.name)}
+              s={s}
+            />
           ))}
+        </div>
+        {/* Current font indicator */}
+        <div style={{ marginTop: 12, padding: "10px 14px", background: s.statusBg,
+          borderRadius: 10, border: `1px solid ${s.statusBdr}` }}>
+          <p style={{ fontSize: 13, color: s.statusTxt, fontWeight: 500 }}>
+            ✏️ Current font: <span style={{ fontFamily: currentCssFamily }}>{FONTS.find(f => f.value === font)?.name || "Georgia"}</span> — will be applied to your next PDF/DOCX export.
+          </p>
         </div>
       </Section>
 

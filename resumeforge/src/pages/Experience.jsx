@@ -127,6 +127,11 @@ export default function Experience() {
   const endLabel = form.employmentType === 'COLLEGE_PROJECT' ? 'Submission Date' : 'End Date';
   const currentLabel = form.employmentType === 'COLLEGE_PROJECT' ? 'Ongoing project' : 'Currently working here';
 
+  // ── Description placeholder — shows example bullet lines ─────────────────
+  const descriptionPlaceholder = form.employmentType === 'COLLEGE_PROJECT'
+    ? 'Built a REST API using Spring Boot and Java\nUsed MySQL for data storage with query optimization\nDeployed using Docker containers\nImplemented JWT authentication for secure access'
+    : 'Developed REST APIs using Spring Boot and Java\nOptimized MySQL queries reducing load time by 30%\nImplemented JWT authentication for secure API access\nFollowed agile scrum and CI/CD pipeline practices';
+
   return (
     <div className="space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
@@ -236,14 +241,15 @@ export default function Experience() {
               </label>
               <textarea
                 className="input-field"
-                rows={4}
-                placeholder={form.employmentType === 'COLLEGE_PROJECT'
-                  ? 'Describe your project, tech stack, and outcomes…'
-                  : 'Describe your role, responsibilities, and achievements…'}
+                rows={5}
+                placeholder={descriptionPlaceholder}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 style={{ resize: 'vertical' }}
               />
+              <p className="text-xs mt-1.5" style={{ color: 'var(--rf-text-muted)' }}>
+                💡 Write 3–4 achievements, each on a new line — every line will appear as a bullet point on your resume.
+              </p>
             </div>
 
             <div className="flex gap-3 justify-end">

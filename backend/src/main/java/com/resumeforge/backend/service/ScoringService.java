@@ -34,6 +34,64 @@ public class ScoringService {
         }
     }
 
+    // ── Fuzzy skill match ─────────────────────────────────────────────────────
+    /**
+     * Returns true if a user skill matches any JD keyword using:
+     *   1. Exact normalized match          ("react" == "react")
+     *   2. Skill contains JD keyword       ("spring boot" contains "spring")
+     *   3. JD keyword contains skill       ("reactjs" contains "react")
+     *   4. Alias / synonym map             ("k8s" → "kubernetes")
+     */
+    private static final Map<String, String> ALIASES = Map.ofEntries(
+        Map.entry("k8s",               "kubernetes"),
+        Map.entry("js",                "javascript"),
+        Map.entry("ts",                "typescript"),
+        Map.entry("postgres",          "postgresql"),
+        Map.entry("mongo",             "mongodb"),
+        Map.entry("node",              "node.js"),
+        Map.entry("nodejs",            "node.js"),
+        Map.entry("reactjs",           "react"),
+        Map.entry("react.js",          "react"),
+        Map.entry("next.js",           "next"),
+        Map.entry("nextjs",            "next"),
+        Map.entry("spring",            "spring boot"),
+        Map.entry("ci cd",             "ci/cd"),
+        Map.entry("cicd",              "ci/cd"),
+        Map.entry("system design",     "distributed systems"),
+        Map.entry("distributed systems","system design"),
+        Map.entry("rest",              "rest api"),
+        Map.entry("restful",           "rest api"),
+        Map.entry("rest api",          "rest"),
+        Map.entry("amazon web services","aws"),
+        Map.entry("aws",               "amazon web services"),
+        Map.entry("gcp",               "google cloud"),
+        Map.entry("google cloud",      "gcp"),
+        Map.entry("tailwind",          "tailwind css"),
+        Map.entry("tailwind css",      "tailwind"),
+        Map.entry("junit",             "unit testing"),
+        Map.entry("unit testing",      "junit"),
+        Map.entry("jest",              "unit testing"),
+        Map.entry("agile",             "agile scrum"),
+        Map.entry("scrum",             "agile scrum")
+    );
+
+    private boolean skillMatchesJd(String normalizedSkill, Set<String> jdKeywords) {
+        // 1. Exact match
+        if (jdKeywords.contains(normalizedSkill)) return true;
+
+        // 2. Alias match
+        String alias = ALIASES.get(normalizedSkill);
+        if (alias != null && jdKeywords.contains(alias)) return true;
+
+        // 3. Partial: skill name is contained within a JD keyword
+        //    e.g. skill="react" matches jd keyword="react.js" or "reactjs"
+        for (String kw : jdKeywords) {
+            if (kw.contains(normalizedSkill) || normalizedSkill.contains(kw)) return true;
+        }
+
+        return false;
+    }
+
     // ── Text scoring ──────────────────────────────────────────────────────────
     public int scoreText(String text, Set<String> jdKeywords) {
         if (text == null || text.isBlank() || jdKeywords.isEmpty()) return 0;
@@ -78,24 +136,23 @@ public class ScoringService {
     public List<Skill> reorderSkills(List<Skill> skills, Set<String> jdKeywords) {
         return skills.stream()
                 .sorted((a, b) -> {
-                    boolean aMatched = jdKeywords.contains(keywordNormalizer.normalize(a.getName()));
-                    boolean bMatched = jdKeywords.contains(keywordNormalizer.normalize(b.getName()));
+                    String normA = keywordNormalizer.normalize(a.getName());
+                    String normB = keywordNormalizer.normalize(b.getName());
+                    boolean aMatched = skillMatchesJd(normA, jdKeywords);
+                    boolean bMatched = skillMatchesJd(normB, jdKeywords);
                     return Boolean.compare(!aMatched, !bMatched);
                 })
                 .collect(Collectors.toList());
     }
 
     /**
-     * detectMissingSkills — fixed version
+     * detectMissingSkills
      *
-     * A keyword is only flagged as "missing" if it does NOT appear in ANY of:
-     *   1. The user's formal Skills list
+     * A JD keyword is only flagged missing if it does NOT appear in ANY of:
+     *   1. User's formal Skills list (with fuzzy matching)
      *   2. Any Experience description
      *   3. Any Project description / tech stack
      *   4. The selected Summary content
-     *
-     * This prevents flagging skills that the user clearly knows
-     * but hasn't added as a formal skill card.
      */
     public List<String> detectMissingSkills(
             List<Skill> userSkills,
@@ -104,36 +161,39 @@ public class ScoringService {
             Summary selectedSummary,
             Set<String> jdKeywords) {
 
-        // 1 — keywords from formal Skills page
-        Set<String> coveredKeywords = userSkills.stream()
+        // Normalized user skill names (for fuzzy checking)
+        List<String> normalizedUserSkills = userSkills.stream()
                 .map(s -> keywordNormalizer.normalize(s.getName()))
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
 
-        // 2 — keywords found in experience descriptions
+        // Keywords covered by experience, projects, summary text
+        Set<String> textCoveredKeywords = new HashSet<>();
         for (Experience e : experiences) {
-            coveredKeywords.addAll(jdParser.extractKeywords(buildExperienceText(e)));
+            textCoveredKeywords.addAll(jdParser.extractKeywords(buildExperienceText(e)));
         }
-
-        // 3 — keywords found in project descriptions + tech stack
         for (Project p : projects) {
-            coveredKeywords.addAll(jdParser.extractKeywords(buildProjectText(p)));
+            textCoveredKeywords.addAll(jdParser.extractKeywords(buildProjectText(p)));
         }
-
-        // 4 — keywords found in the selected summary
         if (selectedSummary != null && selectedSummary.getContent() != null) {
-            coveredKeywords.addAll(jdParser.extractKeywords(selectedSummary.getContent()));
+            textCoveredKeywords.addAll(jdParser.extractKeywords(selectedSummary.getContent()));
         }
 
-        // A JD keyword is truly missing only if it appears nowhere in the resume
         return jdKeywords.stream()
-                .filter(kw -> !coveredKeywords.contains(kw))
+                .filter(kw -> {
+                    // Not covered by skills (fuzzy)
+                    boolean coveredBySkills = normalizedUserSkills.stream()
+                            .anyMatch(skill -> skillMatchesJd(skill, Set.of(kw)));
+                    // Not covered by text content
+                    boolean coveredByText = textCoveredKeywords.contains(kw);
+                    return !coveredBySkills && !coveredByText;
+                })
                 .filter(kw -> kw.length() > 2)
                 .sorted()
                 .collect(Collectors.toList());
     }
 
-    // ── ATS breakdown — main method ───────────────────────────────────────────
-    // Weights: Skills 40% | Projects 30% | Experience 25% | Summary 5%
+    // ── ATS breakdown ─────────────────────────────────────────────────────────
+    // Weights: Skills 40 | Projects 30 | Experience 25 | Summary 5
     public AtsBreakdown calculateAtsBreakdown(
             List<Skill> skills,
             List<Project> projects,
@@ -143,15 +203,23 @@ public class ScoringService {
 
         if (jdKeywords.isEmpty()) return new AtsBreakdown(0, 0, 0, 0);
 
-        // Skills (40) — % of user's own skills that appear in JD
-        long matchedSkills = skills.stream()
-                .map(s -> keywordNormalizer.normalize(s.getName()))
-                .filter(jdKeywords::contains)
+        // ── Skills (40) ───────────────────────────────────────────────────────
+        // FIX: denominator = jdKeywords size, not user skills size.
+        // We count how many JD keywords are covered by the user's skill list.
+        // This way 15/15 JD keywords matched = 40/40, regardless of having 31 skills.
+        long matchedJdKeywords = jdKeywords.stream()
+                .filter(kw -> {
+                    // Is this JD keyword matched by any user skill (fuzzy)?
+                    return skills.stream()
+                            .map(s -> keywordNormalizer.normalize(s.getName()))
+                            .anyMatch(norm -> skillMatchesJd(norm, Set.of(kw)));
+                })
                 .count();
-        int skillScore = (int) Math.min(40,
-                Math.round((double) matchedSkills / Math.max(skills.size(), 1) * 40));
 
-        // Projects (30) — best project's relevance to JD
+        int skillScore = (int) Math.min(40,
+                Math.round((double) matchedJdKeywords / Math.max(jdKeywords.size(), 1) * 40));
+
+        // ── Projects (30) ─────────────────────────────────────────────────────
         int projectScore = 0;
         if (!projects.isEmpty()) {
             int top = projects.stream()
@@ -160,7 +228,7 @@ public class ScoringService {
             projectScore = (int) Math.min(30, Math.round(top * 0.30));
         }
 
-        // Experience (25) — best experience entry's relevance to JD
+        // ── Experience (25) ───────────────────────────────────────────────────
         int expScore = 0;
         if (!experiences.isEmpty()) {
             int top = experiences.stream()
@@ -169,7 +237,7 @@ public class ScoringService {
             expScore = (int) Math.min(25, Math.round(top * 0.25));
         }
 
-        // Summary (5)
+        // ── Summary (5) ───────────────────────────────────────────────────────
         int summaryScore = 0;
         if (selectedSummary != null) {
             summaryScore = (int) Math.min(5,

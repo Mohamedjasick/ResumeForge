@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useToast } from '../components/Toast';
 import ScoreBar from '../components/ScoreBar';
+
+const FONT_KEY = 'rf_resume_font';
 
 function Spinner({ size = 'sm' }) {
   const cls = size === 'lg' ? 'w-6 h-6' : 'w-4 h-4';
@@ -15,51 +17,25 @@ function Spinner({ size = 'sm' }) {
 
 function displayName(skill) {
   const overrides = {
-    'ci cd':                       'CI/CD',
-    'solid principles':            'SOLID Principles',
-    'rest':                        'REST',
-    'rest api':                    'REST API',
-    'jwt':                         'JWT',
-    'aws':                         'AWS',
-    'amazon web services':         'Amazon Web Services',
-    'spring boot':                 'Spring Boot',
-    'spring data jpa':             'Spring Data JPA',
-    'mysql':                       'MySQL',
-    'postgresql':                  'PostgreSQL',
-    'mongodb':                     'MongoDB',
-    'redis':                       'Redis',
-    'docker':                      'Docker',
-    'git':                         'Git',
-    'github':                      'GitHub',
-    'gitlab':                      'GitLab',
-    'node.js':                     'Node.js',
-    'react.js':                    'React.js',
-    'vue.js':                      'Vue.js',
-    'next.js':                     'Next.js',
-    'typescript':                  'TypeScript',
-    'javascript':                  'JavaScript',
-    'html':                        'HTML',
-    'css':                         'CSS',
-    'sql':                         'SQL',
-    'graphql':                     'GraphQL',
-    'microservices':               'Microservices',
-    'kubernetes':                  'Kubernetes',
-    'microsoft azure':             'Microsoft Azure',
-    'google cloud':                'Google Cloud',
-    'machine learning':            'Machine Learning',
-    'deep learning':               'Deep Learning',
+    'ci cd': 'CI/CD', 'solid principles': 'SOLID Principles', 'rest': 'REST',
+    'rest api': 'REST API', 'jwt': 'JWT', 'aws': 'AWS',
+    'amazon web services': 'Amazon Web Services', 'spring boot': 'Spring Boot',
+    'spring data jpa': 'Spring Data JPA', 'mysql': 'MySQL', 'postgresql': 'PostgreSQL',
+    'mongodb': 'MongoDB', 'redis': 'Redis', 'docker': 'Docker', 'git': 'Git',
+    'github': 'GitHub', 'gitlab': 'GitLab', 'node.js': 'Node.js',
+    'react.js': 'React.js', 'vue.js': 'Vue.js', 'next.js': 'Next.js',
+    'typescript': 'TypeScript', 'javascript': 'JavaScript', 'html': 'HTML',
+    'css': 'CSS', 'sql': 'SQL', 'graphql': 'GraphQL', 'microservices': 'Microservices',
+    'kubernetes': 'Kubernetes', 'microsoft azure': 'Microsoft Azure',
+    'google cloud': 'Google Cloud', 'machine learning': 'Machine Learning',
+    'deep learning': 'Deep Learning',
     'natural language processing': 'Natural Language Processing',
     'object oriented programming': 'Object Oriented Programming',
-    'data structures':             'Data Structures',
-    'unit testing':                'Unit Testing',
-    'test driven development':     'Test Driven Development',
-    'code review':                 'Code Review',
-    'problem solving':             'Problem Solving',
-    'open source':                 'Open Source',
-    'database design':             'Database Design',
-    'query optimization':          'Query Optimization',
-    'agile scrum':                 'Agile / Scrum',
-    'version control':             'Version Control',
+    'data structures': 'Data Structures', 'unit testing': 'Unit Testing',
+    'test driven development': 'Test Driven Development', 'code review': 'Code Review',
+    'problem solving': 'Problem Solving', 'open source': 'Open Source',
+    'database design': 'Database Design', 'query optimization': 'Query Optimization',
+    'agile scrum': 'Agile / Scrum', 'version control': 'Version Control',
   };
   return overrides[skill] ?? skill.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
@@ -67,14 +43,9 @@ function displayName(skill) {
 function formatResumeContent(content) {
   if (typeof content === 'string') return content;
   if (!content || typeof content !== 'object') return '';
-
   const lines = [];
   const divider = (char = '─') => lines.push(char.repeat(60));
-  const section = (title) => {
-    lines.push('');
-    lines.push(title.toUpperCase());
-    divider();
-  };
+  const section = (title) => { lines.push(''); lines.push(title.toUpperCase()); divider(); };
 
   const p = content.profile || content.header || content.contact || {};
   if (p.name || p.fullName) lines.push((p.name || p.fullName).toUpperCase());
@@ -82,28 +53,21 @@ function formatResumeContent(content) {
   if (contactParts.length) lines.push(contactParts.join('  |  '));
 
   const summary = p.summary || content.summary;
-  if (summary) {
-    section('Professional Summary');
-    lines.push(typeof summary === 'string' ? summary : JSON.stringify(summary));
-  }
+  if (summary) { section('Professional Summary'); lines.push(typeof summary === 'string' ? summary : JSON.stringify(summary)); }
 
   const skills = content.skills || content.technicalSkills;
   if (skills) {
     section('Skills');
-    if (typeof skills === 'string') {
-      lines.push(skills);
-    } else if (Array.isArray(skills)) {
+    if (typeof skills === 'string') lines.push(skills);
+    else if (Array.isArray(skills)) {
       skills.forEach((s) => {
         if (typeof s === 'string') lines.push(`• ${s}`);
-        else if (s.category && s.skills) {
-          const skillList = Array.isArray(s.skills) ? s.skills.join(', ') : s.skills;
-          lines.push(`${s.category}: ${skillList}`);
-        } else lines.push(`• ${JSON.stringify(s)}`);
+        else if (s.category && s.skills) lines.push(`${s.category}: ${Array.isArray(s.skills) ? s.skills.join(', ') : s.skills}`);
+        else if (s.skillName) lines.push(s.skillName);
+        else lines.push(`• ${JSON.stringify(s)}`);
       });
     } else if (typeof skills === 'object') {
-      Object.entries(skills).forEach(([cat, val]) => {
-        lines.push(`${cat}: ${Array.isArray(val) ? val.join(', ') : val}`);
-      });
+      Object.entries(skills).forEach(([cat, val]) => lines.push(`${cat}: ${Array.isArray(val) ? val.join(', ') : val}`));
     }
   }
 
@@ -135,7 +99,9 @@ function formatResumeContent(content) {
       const name = proj.name || proj.title || 'Project';
       const tech = proj.technologies || proj.techStack || proj.skills;
       const techStr = Array.isArray(tech) ? tech.join(', ') : tech;
-      lines.push(techStr ? `${name}  [${techStr}]` : name);
+      const urlStr = proj.projectUrl || proj.url || proj.link || proj.githubUrl || '';
+      const titleParts = [name, techStr, urlStr].filter(Boolean);
+      lines.push(titleParts.join('  |  '));
       if (proj.description) {
         const desc = typeof proj.description === 'string' ? proj.description : JSON.stringify(proj.description);
         desc.split('\n').forEach((line) => {
@@ -147,7 +113,7 @@ function formatResumeContent(content) {
     });
   }
 
-  const education = content.education;
+  const education = content.education || content.educations;
   if (education && (Array.isArray(education) ? education.length : true)) {
     section('Education');
     const eduArr = Array.isArray(education) ? education : [education];
@@ -161,58 +127,88 @@ function formatResumeContent(content) {
     });
   }
 
-  const certs = content.certifications || content.certificates;
-  if (certs && Array.isArray(certs) && certs.length) {
-    section('Certifications');
-    certs.forEach((c) => {
-      const label = typeof c === 'string' ? c : [c.name, c.issuer, c.year].filter(Boolean).join(' — ');
-      lines.push(`• ${label}`);
-    });
-  }
-
-  const knownKeys = new Set([
-    'profile','header','contact','summary','skills','technicalSkills',
-    'experience','workExperience','experiences','projects',
-    'education','certifications','certificates',
-  ]);
-  Object.entries(content).forEach(([key, val]) => {
-    if (!knownKeys.has(key)) {
-      section(key);
-      lines.push(typeof val === 'string' ? val : JSON.stringify(val, null, 2));
-    }
-  });
-
   return lines.join('\n');
 }
 
-// ── Score color helper ────────────────────────────────────────────────────────
 function scoreColor(score) {
-  if (score >= 70) return '#22c55e';   // green
-  if (score >= 50) return '#f59e0b';   // amber
-  return '#ef4444';                    // red
+  if (score >= 70) return '#22c55e';
+  if (score >= 50) return '#f59e0b';
+  return '#ef4444';
 }
 
-function scoreLabel(score) {
-  if (score >= 70) return 'Good Match';
-  if (score >= 50) return 'Fair Match';
-  return 'Needs Work';
-}
-
-// ── Per-section low-score hints ───────────────────────────────────────────────
 function sectionHint(label, score, max) {
   if (label === 'Skills'     && score < 20) return 'Add more matching skills to your profile';
   if (label === 'Projects'   && score < 15) return 'Improve your project descriptions with more tech keywords';
   if (label === 'Experience' && score < 12) return 'Add more detail to your experience bullet points';
-  if (label === 'Summary'    && score < 2)  return "Your summary doesn't match this JD well — update it";
+  if (label === 'Summary'    && score < 2)  return "Your summary doesn't match this JD — consider updating it";
   return null;
 }
 
+function BreakdownBar({ label, score, max, color }) {
+  const pct = Math.min(100, Math.round((score / max) * 100));
+  const hint = sectionHint(label, score, max);
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--rf-text)' }}>{label}</span>
+        <span style={{ fontSize: '12px', color: 'var(--rf-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          {score} / {max}
+        </span>
+      </div>
+      <div style={{ height: '6px', borderRadius: '3px', background: 'var(--card-border)', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: `${pct}%`, background: color,
+          borderRadius: '3px', transition: 'width 0.7s ease',
+        }} />
+      </div>
+      {hint && (
+        <p style={{ fontSize: '11px', color: 'var(--rf-text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+          💡 {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── sessionStorage keys ───────────────────────────────────────────────────────
+const FORM_KEY   = 'rf_generate_form';
+const RESULT_KEY = 'rf_generate_result';
+
 export default function Generate() {
   const { addToast } = useToast();
-  const [form, setForm] = useState({ jobTitle: '', companyName: '', jdText: '' });
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [errors, setErrors] = useState({});
+
+  // ── Restore from sessionStorage on mount ──────────────────────────────────
+  const [form, setForm] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(FORM_KEY);
+      return saved ? JSON.parse(saved) : { jobTitle: '', companyName: '', jdText: '' };
+    } catch { return { jobTitle: '', companyName: '', jdText: '' }; }
+  });
+
+  const [result, setResult] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(RESULT_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const [loading, setLoading]           = useState(false);
+  const [errors, setErrors]             = useState({});
+  // ── Track which button is downloading ─────────────────────────────────────
+  const [downloading, setDownloading]   = useState(null); // 'pdf' | 'docx' | null
+
+  // ── Persist form on every change ──────────────────────────────────────────
+  useEffect(() => {
+    try { sessionStorage.setItem(FORM_KEY, JSON.stringify(form)); } catch {}
+  }, [form]);
+
+  // ── Persist result whenever it changes ────────────────────────────────────
+  useEffect(() => {
+    try {
+      if (result) sessionStorage.setItem(RESULT_KEY, JSON.stringify(result));
+      else sessionStorage.removeItem(RESULT_KEY);
+    } catch {}
+  }, [result]);
 
   const validate = () => {
     const e = {};
@@ -222,7 +218,7 @@ export default function Generate() {
     else if (form.jdText.trim().split(/\s+/).length < 20)
       e.jdText = 'Please paste a more complete job description (at least 20 words)';
     else if (/\b(hi\s|hello\s|dear\s|regards|salary|lpa|ctc|perks|apply by|deadline|cab facility|health insurance)\b/i.test(form.jdText))
-      e.jdText = 'Looks like this contains recruiter email content. Please paste only the job description section for the best ATS score.';
+      e.jdText = 'Looks like this contains recruiter email content. Please paste only the job description section.';
     return e;
   };
 
@@ -239,44 +235,56 @@ export default function Generate() {
       addToast('Resume generated successfully!', 'success');
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     } catch (err) {
-      addToast(
-        err.response?.data?.message || 'Generation failed. Make sure your profile and skills are set up.',
-        'error'
-      );
+      addToast(err.response?.data?.message || 'Generation failed. Make sure your profile and skills are set up.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownload = (type) => {
+  // ── Download: reads font from localStorage, sends as query param ──────────
+  const handleDownload = async (type) => {
     const token = localStorage.getItem('token');
-    const url = `http://localhost:8080/api/resume/export/${type}/${result.resumeVersionId}`;
-    const a = document.createElement('a');
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.blob())
-      .then((blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        a.href = blobUrl;
-        a.setAttribute('download', `resume.${type}`);
-        a.click();
-        URL.revokeObjectURL(blobUrl);
-      })
-      .catch(() => addToast('Download failed', 'error'));
+    // Read the font key saved by Settings.jsx; default to 'georgia'
+    const font  = localStorage.getItem(FONT_KEY) || 'georgia';
+    const url   = `http://localhost:8080/api/resume/export/${type}/${result.resumeVersionId}?font=${encodeURIComponent(font)}`;
+
+    setDownloading(type);
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Export failed');
+      const blob   = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.setAttribute('download', `resume.${type}`);
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+      addToast(`Resume downloaded as ${type.toUpperCase()}`, 'success');
+    } catch {
+      addToast('Download failed. Please try again.', 'error');
+    } finally {
+      setDownloading(null);
+    }
   };
 
-  const wordCount = form.jdText.trim().split(/\s+/).filter(Boolean).length;
-  const previewText = result?.resumeContent ? formatResumeContent(result.resumeContent) : '';
-  const score = result?.atsScore ?? 0;
+  // ── Clear — wipes form + result + sessionStorage ──────────────────────────
+  const handleClear = () => {
+    setForm({ jobTitle: '', companyName: '', jdText: '' });
+    setResult(null);
+    setErrors({});
+  };
 
-  // Breakdown rows — only rendered when backend sends the fields
-  const breakdownRows = result?.skillScore !== undefined
-    ? [
-        { label: 'Skills',     score: result.skillScore,      max: 40, color: '#1D9E75' },
-        { label: 'Experience', score: result.experienceScore, max: 25, color: '#534AB7' },
-        { label: 'Projects',   score: result.projectScore,    max: 30, color: '#185FA5' },
-        { label: 'Summary',    score: result.summaryScore,    max: 5,  color: '#854F0B' },
-      ]
-    : [];
+  const wordCount   = form.jdText.trim().split(/\s+/).filter(Boolean).length;
+  const previewText = result?.resumeContent ? formatResumeContent(result.resumeContent) : '';
+  const score       = result?.atsScore ?? 0;
+
+  const hasBreakdown  = result !== null && result.skillScore !== undefined && result.skillScore !== null;
+  const breakdownRows = hasBreakdown ? [
+    { label: 'Skills',     score: result.skillScore,      max: 40, color: '#1D9E75' },
+    { label: 'Experience', score: result.experienceScore, max: 25, color: '#534AB7' },
+    { label: 'Projects',   score: result.projectScore,    max: 30, color: '#185FA5' },
+    { label: 'Summary',    score: result.summaryScore,    max: 5,  color: '#854F0B' },
+  ] : [];
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -290,28 +298,22 @@ export default function Generate() {
         </p>
       </div>
 
-      {/* ── Input form ─────────────────────────────────────────────────────── */}
+      {/* ── Input form ────────────────────────────────────────────────────── */}
       <div className="card p-6">
         <form onSubmit={handleGenerate} className="space-y-5">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Job Title *</label>
-              <input
-                className={`input-field ${errors.jobTitle ? 'border-red-500/60' : ''}`}
-                placeholder="Senior Software Engineer"
-                value={form.jobTitle}
-                onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
-              />
+              <input className={`input-field ${errors.jobTitle ? 'border-red-500/60' : ''}`}
+                placeholder="Senior Software Engineer" value={form.jobTitle}
+                onChange={(e) => setForm({ ...form, jobTitle: e.target.value })} />
               {errors.jobTitle && <p className="mt-1.5 text-xs text-red-400">{errors.jobTitle}</p>}
             </div>
             <div>
               <label className="label">Company Name *</label>
-              <input
-                className={`input-field ${errors.companyName ? 'border-red-500/60' : ''}`}
-                placeholder="Google, Meta, Startup Inc…"
-                value={form.companyName}
-                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-              />
+              <input className={`input-field ${errors.companyName ? 'border-red-500/60' : ''}`}
+                placeholder="Google, Meta, Startup Inc…" value={form.companyName}
+                onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
               {errors.companyName && <p className="mt-1.5 text-xs text-red-400">{errors.companyName}</p>}
             </div>
           </div>
@@ -325,10 +327,9 @@ export default function Generate() {
             </div>
             <textarea
               className={`input-field h-56 resize-none font-mono text-sm leading-relaxed ${errors.jdText ? 'border-red-500/60' : ''}`}
-              placeholder={'Paste the full job description here…\n\nWe are looking for a Senior Software Engineer to join our team. You will be responsible for…'}
+              placeholder="Paste the full job description here…"
               value={form.jdText}
-              onChange={(e) => setForm({ ...form, jdText: e.target.value })}
-            />
+              onChange={(e) => setForm({ ...form, jdText: e.target.value })} />
             {errors.jdText && <p className="mt-1.5 text-xs text-red-400">{errors.jdText}</p>}
             <p className="text-xs rf-text-muted mt-1.5">
               Pro tip: Paste only the job description — not the full email. Include requirements, responsibilities,
@@ -336,11 +337,12 @@ export default function Generate() {
             </p>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center">
+            {(form.jobTitle || form.companyName || form.jdText || result)
+              ? <button type="button" onClick={handleClear} className="btn-secondary text-sm px-4 py-2">Clear</button>
+              : <div />}
             <button type="submit" disabled={loading} className="btn-primary px-8 py-3 text-base">
-              {loading ? (
-                <><Spinner size="lg" /> Generating resume…</>
-              ) : (
+              {loading ? <><Spinner size="lg" /> Generating resume…</> : (
                 <>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -353,7 +355,7 @@ export default function Generate() {
         </form>
       </div>
 
-      {/* ── Loading state ──────────────────────────────────────────────────── */}
+      {/* ── Loading ───────────────────────────────────────────────────────── */}
       {loading && (
         <div className="card p-10 text-center">
           <div className="flex justify-center mb-4">
@@ -362,46 +364,73 @@ export default function Generate() {
             </div>
           </div>
           <p className="font-display font-semibold rf-text mb-1">Analyzing job description…</p>
-          <p className="text-sm rf-text-muted">
-            Matching your profile, selecting projects, and optimizing for ATS.
-          </p>
+          <p className="text-sm rf-text-muted">Matching your profile, selecting projects, and optimizing for ATS.</p>
         </div>
       )}
 
-      {/* ── Results ────────────────────────────────────────────────────────── */}
+      {/* ── Results ───────────────────────────────────────────────────────── */}
       {result && !loading && (
         <div className="space-y-5 animate-fade-up">
 
-          {/* Score + Export */}
           <div className="grid sm:grid-cols-2 gap-5">
-            <div className="card p-6">
-              <ScoreBar score={score} />
-            </div>
+            <div className="card p-6"><ScoreBar score={score} /></div>
             <div className="card p-6 flex flex-col justify-between gap-4">
               <div>
                 <p className="font-display font-semibold rf-text mb-1">Export Resume</p>
-                <p className="text-xs rf-text-muted">Download your tailored resume in your preferred format</p>
+                <p className="text-xs rf-text-muted">
+                  Download your tailored resume in your preferred format.{' '}
+                  <span className="text-xs" style={{ color: 'var(--rf-text-muted)', fontStyle: 'italic' }}>
+                    Font: <strong>{localStorage.getItem(FONT_KEY) || 'georgia'}</strong>
+                    {' '}— change in{' '}
+                    <a href="/settings" style={{ color: 'var(--rf-accent, #6272f5)', textDecoration: 'underline' }}>
+                      Settings
+                    </a>
+                  </span>
+                </p>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => handleDownload('pdf')} className="btn-primary flex-1 justify-center">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  PDF
+                {/* PDF button */}
+                <button
+                  onClick={() => handleDownload('pdf')}
+                  disabled={downloading !== null}
+                  className="btn-primary flex-1 justify-center"
+                >
+                  {downloading === 'pdf' ? (
+                    <><Spinner /> Exporting…</>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      PDF
+                    </>
+                  )}
                 </button>
-                <button onClick={() => handleDownload('docx')} className="btn-secondary flex-1 justify-center">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  DOCX
+
+                {/* DOCX button */}
+                <button
+                  onClick={() => handleDownload('docx')}
+                  disabled={downloading !== null}
+                  className="btn-secondary flex-1 justify-center"
+                >
+                  {downloading === 'docx' ? (
+                    <><Spinner /> Exporting…</>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      DOCX
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* ── ATS Score Breakdown ────────────────────────────────────────── */}
+          {/* ── ATS Score breakdown ──────────────────────────────────────── */}
           <div className="card p-5">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--rf-text-muted)' }}
@@ -413,58 +442,32 @@ export default function Generate() {
                 <p className="font-display font-semibold rf-text text-sm mb-1">ATS Score Breakdown</p>
                 <p className="text-xs rf-text-muted leading-relaxed">
                   Your score of{' '}
-                  <span className="font-bold text-sm" style={{ color: scoreColor(score) }}>
-                    {score}/100
-                  </span>{' '}
+                  <span className="font-bold text-sm" style={{ color: scoreColor(score) }}>{score}/100</span>{' '}
                   is calculated by matching your skills, experience keywords, and profile against the job description.
                   {result.missingSkills?.length === 0
                     ? ' Great — your profile covers the key requirements well!'
                     : result.missingSkills?.length <= 5
                     ? ` You're close — adding the ${result.missingSkills.length} missing skill${result.missingSkills.length > 1 ? 's' : ''} below could push your score higher.`
                     : score >= 70
-                    ? ` Your profile matches well. The ${result.missingSkills.length} missing skills are mostly optional or good-to-have for this role.`
-                    : ` Your profile partially matches this role. Adding missing skills and tailoring your experience descriptions will help.`}
+                    ? ` Your profile matches well. The ${result.missingSkills?.length} missing skills are mostly optional.`
+                    : ' Your profile partially matches this role. Adding missing skills will help.'}
                 </p>
 
-                {/* ── Per-section progress bars ───────────────────────────── */}
                 {breakdownRows.length > 0 && (
-                  <div style={{ marginTop: '14px' }}>
-                    {breakdownRows.map(({ label, score: s, max, color }) => {
-                      const hint = sectionHint(label, s, max);
-                      return (
-                        <div key={label} style={{ marginBottom: '10px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                            <span style={{ color: 'var(--rf-text)' }}>{label}</span>
-                            <span style={{ color: 'var(--rf-text-muted)' }}>{s} / {max}</span>
-                          </div>
-                          <div style={{ height: '6px', borderRadius: '3px', background: 'var(--card-border)', overflow: 'hidden' }}>
-                            <div style={{
-                              height: '100%',
-                              width: `${(s / max) * 100}%`,
-                              background: color,
-                              borderRadius: '3px',
-                              transition: 'width 0.6s ease',
-                            }} />
-                          </div>
-                          {hint && (
-                            <p style={{ fontSize: '11px', color: 'var(--rf-text-muted)', marginTop: '3px', fontStyle: 'italic' }}>
-                              💡 {hint}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--card-border)' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--rf-text-muted)', letterSpacing: '0.05em', marginBottom: '12px', textTransform: 'uppercase' }}>
+                      Score by section
+                    </p>
+                    {breakdownRows.map((row) => <BreakdownBar key={row.label} {...row} />)}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--card-border)', marginTop: '4px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--rf-text)' }}>Total</span>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: scoreColor(score) }}>{score} / 100</span>
+                    </div>
                   </div>
                 )}
 
-                {/* ── Highlighted disclaimer ──────────────────────────────── */}
-                <div
-                  className="mt-3 px-3 py-2.5 rounded-lg flex items-start gap-2"
-                  style={{
-                    background: 'rgba(245, 158, 11, 0.08)',
-                    border: '1px solid rgba(245, 158, 11, 0.25)',
-                  }}
-                >
+                <div className="mt-3 px-3 py-2.5 rounded-lg flex items-start gap-2"
+                  style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
                   <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: '#f59e0b' }}
                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -479,7 +482,7 @@ export default function Generate() {
             </div>
           </div>
 
-          {/* ── Missing skills ─────────────────────────────────────────────── */}
+          {/* ── Missing skills ────────────────────────────────────────────── */}
           {result.missingSkills?.length > 0 && (
             <div className="card p-6">
               <div className="flex items-center gap-2 mb-3">
@@ -488,9 +491,7 @@ export default function Generate() {
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <p className="font-display font-semibold rf-text">Missing Skills</p>
-                <span className="text-xs rf-text-muted">
-                  ({result.missingSkills.length} skills from JD not in your profile)
-                </span>
+                <span className="text-xs rf-text-muted">({result.missingSkills.length} skills from JD not in your profile)</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {result.missingSkills.map((skill, i) => (
@@ -499,26 +500,20 @@ export default function Generate() {
                   </span>
                 ))}
               </div>
-              <p className="text-xs rf-text-muted mt-3">
-                Add these skills to your profile to improve your ATS score for similar roles.
-              </p>
+              <p className="text-xs rf-text-muted mt-3">Add these skills to your profile to improve your ATS score for similar roles.</p>
             </div>
           )}
 
-          {/* ── Resume preview ─────────────────────────────────────────────── */}
+          {/* ── Resume preview ────────────────────────────────────────────── */}
           {previewText && (
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <p className="font-display font-semibold rf-text">Resume Preview</p>
                 <span className="text-xs rf-text-muted font-mono">Version #{result.resumeVersionId}</span>
               </div>
-              <div
-                className="rounded-xl p-6 border overflow-auto max-h-[600px]"
-                style={{ background: 'var(--input-bg)', borderColor: 'var(--card-border)' }}
-              >
-                <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed rf-text">
-                  {previewText}
-                </pre>
+              <div className="rounded-xl p-6 border overflow-auto max-h-[600px]"
+                style={{ background: 'var(--input-bg)', borderColor: 'var(--card-border)' }}>
+                <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed rf-text">{previewText}</pre>
               </div>
             </div>
           )}

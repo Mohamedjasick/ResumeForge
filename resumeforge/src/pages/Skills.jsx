@@ -28,6 +28,15 @@ const catColors = {
 
 const empty = { name: '', proficiency: 'INTERMEDIATE', category: 'TECHNICAL' };
 
+// ── Extract the most useful error message from an axios error ─────────────────
+function getErrorMessage(err, fallback) {
+  // Backend sends message in: err.response.data.message OR err.response.data (plain string)
+  const data = err?.response?.data;
+  if (typeof data === 'string' && data.trim()) return data.trim();
+  if (data?.message && typeof data.message === 'string') return data.message.trim();
+  return fallback;
+}
+
 export default function Skills() {
   const { addToast } = useToast();
   const [skills, setSkills] = useState([]);
@@ -57,11 +66,15 @@ export default function Skills() {
         addToast('Skill updated', 'success');
       } else {
         await api.post('/skills', form);
-        addToast('Skill added', 'success');
+        addToast('Skill added successfully!', 'success');
       }
       setForm(empty); setEditId(null);
       fetchSkills();
-    } catch { addToast('Failed to save skill', 'error'); }
+    } catch (err) {
+      // ── Show the actual backend error message (e.g. "Skill 'Java' already exists") ──
+      const msg = getErrorMessage(err, editId ? 'Failed to update skill' : 'Failed to add skill');
+      addToast(msg, 'error');
+    }
     setSubmitting(false);
   };
 
@@ -77,7 +90,9 @@ export default function Skills() {
       await api.delete(`/skills/${id}`);
       addToast('Skill removed', 'success');
       setSkills((prev) => prev.filter((s) => s.id !== id));
-    } catch { addToast('Failed to delete skill', 'error'); }
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Failed to delete skill'), 'error');
+    }
     setDeletingId(null);
   };
 

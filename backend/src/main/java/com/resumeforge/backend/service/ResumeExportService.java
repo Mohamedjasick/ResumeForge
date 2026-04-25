@@ -38,6 +38,55 @@ public class ResumeExportService {
     private final ResumeVersionRepository resumeVersionRepository;
     private final ObjectMapper objectMapper;
 
+    // ─── Font resolution ──────────────────────────────────────────────────────
+    //
+    // Settings.jsx saves one of these values to localStorage key "rf_resume_font":
+    //   georgia | playfair | lato | merriweather | nunito | libre_baskerville
+    //
+    // For PDF we map to iText StandardFonts (only Type-1 fonts are built in).
+    // Web fonts (Playfair, Lato, etc.) are not available as StandardFonts, so we
+    // map them to the closest professional equivalent:
+    //
+    //   georgia / merriweather / libre_baskerville / playfair  → TIMES_ROMAN (serif)
+    //   lato / nunito                                          → HELVETICA   (sans-serif)
+    //
+    // For DOCX we use the actual font name — Word/LibreOffice will render it if
+    // the font is installed on the reader's machine, which is standard behaviour.
+
+    private String resolvePdfFontName(String fontKey) {
+        if (fontKey == null) return StandardFonts.TIMES_ROMAN;
+        return switch (fontKey.toLowerCase()) {
+            case "lato", "nunito"                              -> StandardFonts.HELVETICA;
+            default                                            -> StandardFonts.TIMES_ROMAN;
+            // georgia, playfair, merriweather, libre_baskerville → Times Roman (best serif match)
+        };
+    }
+
+    private String resolvePdfBoldFontName(String fontKey) {
+        if (fontKey == null) return StandardFonts.TIMES_BOLD;
+        return switch (fontKey.toLowerCase()) {
+            case "lato", "nunito" -> StandardFonts.HELVETICA_BOLD;
+            default               -> StandardFonts.TIMES_BOLD;
+        };
+    }
+
+    /**
+     * Returns the exact font-family name to embed in the DOCX run.
+     * Word/LibreOffice will use the font if installed, or fall back gracefully.
+     */
+    private String resolveDocxFontFamily(String fontKey) {
+        if (fontKey == null) return "Georgia";
+        return switch (fontKey.toLowerCase()) {
+            case "georgia"           -> "Georgia";
+            case "playfair"          -> "Playfair Display";
+            case "lato"              -> "Lato";
+            case "merriweather"      -> "Merriweather";
+            case "nunito"            -> "Nunito";
+            case "libre_baskerville" -> "Libre Baskerville";
+            default                  -> "Georgia";
+        };
+    }
+
     // ─── Shared: fetch and parse ──────────────────────────────────────────────
 
     private ResumeExportData getExportData(Long resumeVersionId, Long userId) {
@@ -57,17 +106,18 @@ public class ResumeExportService {
 
     // ─── PDF Export ───────────────────────────────────────────────────────────
 
-    public byte[] exportToPdf(Long resumeVersionId, Long userId) throws IOException {
+    public byte[] exportToPdf(Long resumeVersionId, Long userId, String fontKey) throws IOException {
         ResumeExportData data = getExportData(resumeVersionId, userId);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer   = new PdfWriter(baos);
+        PdfWriter   writer = new PdfWriter(baos);
         PdfDocument pdf    = new PdfDocument(writer);
         Document    doc    = new Document(pdf, PageSize.A4);
         doc.setMargins(40, 50, 40, 50);
 
-        PdfFont bold    = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
-        PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+        // ── Resolve fonts from the key passed by the frontend ─────────────────
+        PdfFont regular = PdfFontFactory.createFont(resolvePdfFontName(fontKey));
+        PdfFont bold    = PdfFontFactory.createFont(resolvePdfBoldFontName(fontKey));
 
         DeviceRgb headerColor  = new DeviceRgb(30,  30,  30);
         DeviceRgb sectionColor = new DeviceRgb(26,  26,  26);
@@ -134,7 +184,6 @@ public class ResumeExportService {
         if (educations != null && !educations.isEmpty()) {
             addPdfSectionHeader(doc, bold, sectionColor, "EDUCATION");
             for (ResumeExportData.EducationSection edu : educations) {
-
                 Paragraph eduLine = new Paragraph()
                         .add(new Text(nvl(edu.getDegree())
                                 + (edu.getFieldOfStudy() != null ? " — " + edu.getFieldOfStudy() : ""))
@@ -184,12 +233,10 @@ public class ResumeExportService {
         if (data.getExperiences() != null && !data.getExperiences().isEmpty()) {
             addPdfSectionHeader(doc, bold, sectionColor, "EXPERIENCE");
             for (ResumeExportData.ExperienceSection exp : data.getExperiences()) {
-                // Problem 7 fix: skip date range entirely when both sides are "—"
                 String start = formatDate(exp.getStartDate());
                 String end   = formatDate(exp.getEndDate());
                 String dates = (start.equals("—") && end.equals("—")) ? "" : start + " – " + end;
 
-                // Problem 8 fix: use null-safe joiner to skip blank parts
                 String titleLine = Stream.of(exp.getJobTitle(), exp.getCompanyName(), dates.isBlank() ? null : dates)
                         .filter(s -> s != null && !s.isBlank())
                         .collect(Collectors.joining("  |  "));
@@ -216,27 +263,28 @@ public class ResumeExportService {
         if (data.getProjects() != null && !data.getProjects().isEmpty()) {
             addPdfSectionHeader(doc, bold, sectionColor, "PROJECTS");
             for (ResumeExportData.ProjectSection proj : data.getProjects()) {
-                // Problem 8 fix: use null-safe joiner for project title + techStack
-                String titleLine = Stream.of(proj.getTitle(),
-                                (proj.getTechStack() != null && !proj.getTechStack().isBlank()) ? proj.getTechStack() : null)
+                String nonUrlPart = Stream.of(
+                                proj.getTitle(),
+                                (proj.getTechStack() != null && !proj.getTechStack().isBlank())
+                                        ? proj.getTechStack() : null)
                         .filter(s -> s != null && !s.isBlank())
                         .collect(Collectors.joining("  |  "));
 
-                doc.add(new Paragraph()
-                        .add(new Text(titleLine).setFont(bold).setFontSize(10))
-                        .setMarginBottom(3));
+                Paragraph titlePara = new Paragraph().setMarginBottom(3);
+                titlePara.add(new Text(nonUrlPart).setFont(bold).setFontSize(10));
+
+                if (proj.getProjectUrl() != null && !proj.getProjectUrl().isBlank()) {
+                    titlePara.add(new Text("  |  " + proj.getProjectUrl())
+                            .setFont(regular).setFontSize(9).setFontColor(linkColor));
+                }
+                doc.add(titlePara);
 
                 if (proj.getDescription() != null && !proj.getDescription().isBlank()) {
                     doc.add(new Paragraph("• " + proj.getDescription())
                             .setFont(regular).setFontSize(10)
                             .setMarginLeft(12).setMarginBottom(2));
                 }
-                if (proj.getProjectUrl() != null && !proj.getProjectUrl().isBlank()) {
-                    doc.add(new Paragraph(proj.getProjectUrl())
-                            .setFont(regular).setFontSize(9)
-                            .setFontColor(linkColor)
-                            .setMarginLeft(12).setMarginBottom(4));
-                }
+                doc.add(new Paragraph("").setMarginBottom(4));
             }
         }
 
@@ -255,13 +303,16 @@ public class ResumeExportService {
 
     // ─── DOCX Export ──────────────────────────────────────────────────────────
 
-    public byte[] exportToDocx(Long resumeVersionId, Long userId) throws IOException {
+    public byte[] exportToDocx(Long resumeVersionId, Long userId, String fontKey) throws IOException {
         ResumeExportData data = getExportData(resumeVersionId, userId);
+
+        // ── Resolve font family name from key ─────────────────────────────────
+        String fontFamily = resolveDocxFontFamily(fontKey);
 
         try (XWPFDocument docx = new XWPFDocument();
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
-            CTSectPr sectPr  = docx.getDocument().getBody().addNewSectPr();
+            CTSectPr  sectPr  = docx.getDocument().getBody().addNewSectPr();
             CTPageMar pageMar = sectPr.addNewPgMar();
             pageMar.setTop(BigInteger.valueOf(720));
             pageMar.setBottom(BigInteger.valueOf(720));
@@ -273,12 +324,13 @@ public class ResumeExportService {
             // ── Header ───────────────────────────────────────────────────────
             if (p != null) {
                 if (p.getFullName() != null) {
-                    XWPFParagraph name = docx.createParagraph();
+                    XWPFParagraph name    = docx.createParagraph();
                     name.setAlignment(ParagraphAlignment.CENTER);
                     XWPFRun nameRun = name.createRun();
                     nameRun.setText(p.getFullName());
                     nameRun.setBold(true);
                     nameRun.setFontSize(18);
+                    nameRun.setFontFamily(fontFamily);
                     nameRun.setColor("1E1E1E");
                 }
 
@@ -286,11 +338,12 @@ public class ResumeExportService {
                 appendIfNotBlank(contactStr, p.getEmail());
                 appendIfNotBlank(contactStr, p.getPhone());
                 appendIfNotBlank(contactStr, p.getLocation());
-                XWPFParagraph contact = docx.createParagraph();
+                XWPFParagraph contact    = docx.createParagraph();
                 contact.setAlignment(ParagraphAlignment.CENTER);
                 XWPFRun contactRun = contact.createRun();
                 contactRun.setText(contactStr.toString());
                 contactRun.setFontSize(9);
+                contactRun.setFontFamily(fontFamily);
                 contactRun.setColor("646464");
 
                 StringBuilder linksStr = new StringBuilder();
@@ -298,27 +351,29 @@ public class ResumeExportService {
                 appendIfNotBlank(linksStr, p.getGithubUrl());
                 appendIfNotBlank(linksStr, p.getPortfolioUrl());
                 if (linksStr.length() > 0) {
-                    XWPFParagraph links = docx.createParagraph();
+                    XWPFParagraph links    = docx.createParagraph();
                     links.setAlignment(ParagraphAlignment.CENTER);
                     XWPFRun linksRun = links.createRun();
                     linksRun.setText(linksStr.toString());
                     linksRun.setFontSize(9);
+                    linksRun.setFontFamily(fontFamily);
                     linksRun.setColor("0066CC");
                 }
             }
 
             // ── Summary ───────────────────────────────────────────────────────
             if (data.getSummary() != null && !data.getSummary().isBlank()) {
-                addDocxSectionHeader(docx, "SUMMARY");
+                addDocxSectionHeader(docx, "SUMMARY", fontFamily);
                 XWPFParagraph sp = docx.createParagraph();
                 XWPFRun sr = sp.createRun();
                 sr.setText(data.getSummary());
                 sr.setFontSize(10);
+                sr.setFontFamily(fontFamily);
             }
 
             // ── Skills ────────────────────────────────────────────────────────
             if (data.getSkills() != null && !data.getSkills().isEmpty()) {
-                addDocxSectionHeader(docx, "SKILLS");
+                addDocxSectionHeader(docx, "SKILLS", fontFamily);
                 String skillLine = data.getSkills().stream()
                         .map(ResumeExportData.SkillSection::getSkillName)
                         .collect(Collectors.joining(", "));
@@ -326,14 +381,14 @@ public class ResumeExportService {
                 XWPFRun sr = sp.createRun();
                 sr.setText(skillLine);
                 sr.setFontSize(10);
+                sr.setFontFamily(fontFamily);
             }
 
             // ── Education ─────────────────────────────────────────────────────
             List<ResumeExportData.EducationSection> educations = data.getEducations();
             if (educations != null && !educations.isEmpty()) {
-                addDocxSectionHeader(docx, "EDUCATION");
+                addDocxSectionHeader(docx, "EDUCATION", fontFamily);
                 for (ResumeExportData.EducationSection edu : educations) {
-
                     XWPFParagraph ep = docx.createParagraph();
                     XWPFRun er = ep.createRun();
                     String degreeLine = nvl(edu.getDegree())
@@ -344,6 +399,7 @@ public class ResumeExportService {
                     er.setText(degreeLine);
                     er.setBold(true);
                     er.setFontSize(10);
+                    er.setFontFamily(fontFamily);
 
                     if (edu.getSchoolTwelfthName() != null && !edu.getSchoolTwelfthName().isBlank()) {
                         XWPFParagraph twelfthPara = docx.createParagraph();
@@ -354,6 +410,7 @@ public class ResumeExportService {
                                 + (edu.getTwelfthPercentage() != null ? "  |  " + edu.getTwelfthPercentage() : "")
                                 + (edu.getTwelfthYear()       != null ? "  |  " + edu.getTwelfthYear()       : ""));
                         twelfthRun.setFontSize(9);
+                        twelfthRun.setFontFamily(fontFamily);
                         twelfthRun.setColor("646464");
                     }
 
@@ -366,6 +423,7 @@ public class ResumeExportService {
                                 + (edu.getTenthPercentage() != null ? "  |  " + edu.getTenthPercentage() : "")
                                 + (edu.getTenthYear()       != null ? "  |  " + edu.getTenthYear()       : ""));
                         tenthRun.setFontSize(9);
+                        tenthRun.setFontFamily(fontFamily);
                         tenthRun.setColor("646464");
                     }
 
@@ -375,14 +433,12 @@ public class ResumeExportService {
 
             // ── Experience ────────────────────────────────────────────────────
             if (data.getExperiences() != null && !data.getExperiences().isEmpty()) {
-                addDocxSectionHeader(docx, "EXPERIENCE");
+                addDocxSectionHeader(docx, "EXPERIENCE", fontFamily);
                 for (ResumeExportData.ExperienceSection exp : data.getExperiences()) {
-                    // Problem 7 fix: skip date range entirely when both sides are "—"
                     String start = formatDate(exp.getStartDate());
                     String end   = formatDate(exp.getEndDate());
                     String dates = (start.equals("—") && end.equals("—")) ? "" : start + " – " + end;
 
-                    // Problem 8 fix: use null-safe joiner to skip blank parts
                     String titleLine = Stream.of(exp.getJobTitle(), exp.getCompanyName(), dates.isBlank() ? null : dates)
                             .filter(s -> s != null && !s.isBlank())
                             .collect(Collectors.joining("  |  "));
@@ -392,6 +448,7 @@ public class ResumeExportService {
                     tr.setText(titleLine);
                     tr.setBold(true);
                     tr.setFontSize(10);
+                    tr.setFontFamily(fontFamily);
 
                     if (exp.getDescription() != null && !exp.getDescription().isBlank()) {
                         String[] bullets = exp.getDescription().split("(?<=\\.)\\s+|\\n+");
@@ -402,6 +459,7 @@ public class ResumeExportService {
                                 XWPFRun br = bp.createRun();
                                 br.setText("• " + bullet.trim());
                                 br.setFontSize(10);
+                                br.setFontFamily(fontFamily);
                             }
                         }
                     }
@@ -411,19 +469,30 @@ public class ResumeExportService {
 
             // ── Projects ──────────────────────────────────────────────────────
             if (data.getProjects() != null && !data.getProjects().isEmpty()) {
-                addDocxSectionHeader(docx, "PROJECTS");
+                addDocxSectionHeader(docx, "PROJECTS", fontFamily);
                 for (ResumeExportData.ProjectSection proj : data.getProjects()) {
-                    // Problem 8 fix: use null-safe joiner for project title + techStack
-                    String titleLine = Stream.of(proj.getTitle(),
-                                    (proj.getTechStack() != null && !proj.getTechStack().isBlank()) ? proj.getTechStack() : null)
+                    XWPFParagraph tp = docx.createParagraph();
+
+                    String boldPart = Stream.of(
+                                    proj.getTitle(),
+                                    (proj.getTechStack() != null && !proj.getTechStack().isBlank())
+                                            ? proj.getTechStack() : null)
                             .filter(s -> s != null && !s.isBlank())
                             .collect(Collectors.joining("  |  "));
 
-                    XWPFParagraph tp = docx.createParagraph();
-                    XWPFRun tr = tp.createRun();
-                    tr.setText(titleLine);
-                    tr.setBold(true);
-                    tr.setFontSize(10);
+                    XWPFRun boldRun = tp.createRun();
+                    boldRun.setText(boldPart);
+                    boldRun.setBold(true);
+                    boldRun.setFontSize(10);
+                    boldRun.setFontFamily(fontFamily);
+
+                    if (proj.getProjectUrl() != null && !proj.getProjectUrl().isBlank()) {
+                        XWPFRun urlRun = tp.createRun();
+                        urlRun.setText("  |  " + proj.getProjectUrl());
+                        urlRun.setFontSize(9);
+                        urlRun.setFontFamily(fontFamily);
+                        urlRun.setColor("0066CC");
+                    }
 
                     if (proj.getDescription() != null && !proj.getDescription().isBlank()) {
                         XWPFParagraph dp = docx.createParagraph();
@@ -431,15 +500,9 @@ public class ResumeExportService {
                         XWPFRun dr = dp.createRun();
                         dr.setText("• " + proj.getDescription());
                         dr.setFontSize(10);
+                        dr.setFontFamily(fontFamily);
                     }
-                    if (proj.getProjectUrl() != null && !proj.getProjectUrl().isBlank()) {
-                        XWPFParagraph up = docx.createParagraph();
-                        up.setIndentationLeft(300);
-                        XWPFRun ur = up.createRun();
-                        ur.setText(proj.getProjectUrl());
-                        ur.setFontSize(9);
-                        ur.setColor("0066CC");
-                    }
+
                     docx.createParagraph();
                 }
             }
@@ -449,13 +512,14 @@ public class ResumeExportService {
         }
     }
 
-    private void addDocxSectionHeader(XWPFDocument docx, String title) {
+    private void addDocxSectionHeader(XWPFDocument docx, String title, String fontFamily) {
         XWPFParagraph header = docx.createParagraph();
         header.setSpacingBefore(160);
         XWPFRun run = header.createRun();
         run.setText(title);
         run.setBold(true);
         run.setFontSize(11);
+        run.setFontFamily(fontFamily);
         run.setColor("1a1a1a");
         run.addBreak();
     }

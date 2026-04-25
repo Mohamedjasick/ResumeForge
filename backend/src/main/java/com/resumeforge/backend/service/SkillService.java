@@ -26,9 +26,24 @@ public class SkillService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // ── Duplicate check ───────────────────────────────────────────────────
+        // Normalize: trim + lowercase before comparing so "Java" and "java"
+        // and "  Java  " are all treated as the same skill.
+        String normalizedName = request.getName().trim().toLowerCase();
+
+        boolean alreadyExists = skillRepository.findByUserId(userId)
+                .stream()
+                .anyMatch(s -> s.getName().trim().toLowerCase().equals(normalizedName));
+
+        if (alreadyExists) {
+            throw new RuntimeException(
+                "Skill '" + request.getName().trim() + "' already exists in your profile.");
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         Skill skill = Skill.builder()
                 .user(user)
-                .name(request.getName())
+                .name(request.getName().trim())   // always store trimmed
                 .category(request.getCategory())
                 .proficiency(request.getProficiency())
                 .build();
@@ -45,7 +60,22 @@ public class SkillService {
             throw new RuntimeException("Unauthorized");
         }
 
-        skill.setName(request.getName());
+        // ── Duplicate check on update ─────────────────────────────────────────
+        // Make sure the new name doesn't clash with another skill (excluding itself)
+        String normalizedName = request.getName().trim().toLowerCase();
+
+        boolean clashExists = skillRepository.findByUserId(userId)
+                .stream()
+                .filter(s -> !s.getId().equals(skillId))   // exclude current skill
+                .anyMatch(s -> s.getName().trim().toLowerCase().equals(normalizedName));
+
+        if (clashExists) {
+            throw new RuntimeException(
+                "Skill '" + request.getName().trim() + "' already exists in your profile.");
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        skill.setName(request.getName().trim());
         skill.setCategory(request.getCategory());
         skill.setProficiency(request.getProficiency());
 
