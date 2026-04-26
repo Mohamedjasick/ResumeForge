@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)]()
 
-**Built by [Mohamed Jasick](https://github.com/YOUR_GITHUB_USERNAME)**
+**Built by [Mohamedjasick](https://github.com/YOUR_GITHUB_USERNAME)**
 
 ---
 
@@ -172,7 +172,7 @@ The ATS score is calculated out of 100 across 4 sections:
 
 ---
 
-## Roadmap
+## Future Work
 
 - [ ] Deploy to production
 - [ ] Cover letter generator using the same JD input
@@ -193,7 +193,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 <div align="center">
 
-Made with ❤️ by [Mohamed Jasick](https://github.com/Mohamedjasick)
+Made with ❤️ by [Mohamedjasick](https://github.com/Mohamedjasick)
 
 *Star ⭐ this repo if you found it useful!*
 
