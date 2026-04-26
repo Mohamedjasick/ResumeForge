@@ -1,0 +1,62 @@
+# ── Backend — Java / Maven ────────────────────────────────────────────────────
+backend/target/
+backend/*.class
+backend/*.jar
+backend/*.war
+
+# Maven wrapper (keep mvnw scripts, ignore downloaded wrapper jar)
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Spring Boot secrets — NEVER commit these
+backend/src/main/resources/application-local.properties
+backend/src/main/resources/application-prod.properties
+backend/src/main/resources/application-secret.properties
+
+# ── Frontend — Node / Vite / React ───────────────────────────────────────────
+resumeforge/node_modules/
+resumeforge/dist/
+resumeforge/build/
+resumeforge/.vite/
+resumeforge/coverage/
+
+# Environment variables — NEVER commit
+resumeforge/.env
+resumeforge/.env.local
+resumeforge/.env.development.local
+resumeforge/.env.test.local
+resumeforge/.env.production.local
+
+# ── IDE — IntelliJ IDEA ───────────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ── IDE — VS Code ────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+
+# ── IDE — Eclipse ────────────────────────────────────────────────────────────
+.eclipse/
+.classpath
+.project
+.settings/
+
+# ── OS files ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+spring.log
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+*.tmp
+*.bak
+*.swp
+*.orig
+HELP.md
