@@ -17,7 +17,7 @@ public class CorsConfig {
 
         config.setAllowedOriginPatterns(List.of(
             "http://localhost:5173",
-            "https://resumeforge.vercel.app",
+            "https://resumeforge-hmj.vercel.app",
             "https://*.vercel.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

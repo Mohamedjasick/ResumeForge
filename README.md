@@ -19,7 +19,14 @@
 
 ### 🌐 Live Demo
 
-**[resumeforge.live](https://your-live-link-here.com)** ← *(Coming soon)*
+**[resumeforge-hmj.vercel.app](https://resumeforge-hmj.vercel.app)**
+
+| Service | URL |
+|---------|-----|
+| Frontend | [resumeforge-hmj.vercel.app](https://resumeforge-hmj.vercel.app) |
+| Backend API | [resumeforge-backend-5754.onrender.com](https://resumeforge-backend-5754.onrender.com) |
+
+> ⚠️ Backend is hosted on Render free tier — it may take **50+ seconds** to wake up on first request.
 
 ---
 
@@ -58,6 +65,9 @@ Paste a job description, get a tailored resume with a score out of 100, see whic
 | PDF Export | iText 7 |
 | DOCX Export | Apache POI |
 | Build Tool | Maven |
+| Frontend Hosting | Vercel |
+| Backend Hosting | Render (Docker) |
+| Database Hosting | Clever Cloud (MySQL DEV) |
 
 ---
 
@@ -66,6 +76,7 @@ Paste a job description, get a tailored resume with a score out of 100, see whic
 ```
 ResumeForge/
 ├── backend/                          # Spring Boot REST API
+│   ├── Dockerfile                    # Multi-stage Maven + Java 17 build
 │   └── src/main/java/com/resumeforge/backend/
 │       ├── controller/               # REST endpoints
 │       ├── service/                  # Business logic
@@ -75,6 +86,7 @@ ResumeForge/
 │       ├── entity/                   # JPA entities
 │       ├── repository/               # Spring Data repositories
 │       ├── dto/                      # Request & response DTOs
+│       ├── config/                   # CORS configuration
 │       ├── security/                 # JWT filter & util
 │       └── util/
 │           ├── JdParser.java         # JD keyword extraction
@@ -90,7 +102,7 @@ ResumeForge/
 
 ---
 
-## Getting Started
+## Getting Started (Local Development)
 
 ### Prerequisites
 
@@ -139,6 +151,37 @@ Frontend runs at `http://localhost:5173`
 
 ---
 
+## Production Deployment
+
+### Backend — Render (Docker)
+
+The backend is deployed on Render using Docker. Set these environment variables in Render:
+
+| Variable | Description |
+|----------|-------------|
+| `SPRING_DATASOURCE_URL` | `jdbc:mysql://<host>:<port>/<db>?useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC` |
+| `SPRING_DATASOURCE_USERNAME` | Your MySQL username |
+| `SPRING_DATASOURCE_PASSWORD` | Your MySQL password |
+| `JWT_SECRET` | A long random secret string |
+
+### Frontend — Vercel
+
+Set this environment variable in Vercel:
+
+| Variable | Value |
+|----------|-------|
+| `VITE_API_URL` | `https://resumeforge-backend-5754.onrender.com` |
+
+- **Root Directory:** `resumeforge`
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+
+### Database — Clever Cloud MySQL (Free DEV plan)
+
+The production database is hosted on [Clever Cloud](https://clever-cloud.com) using their free MySQL DEV plan. Create an add-on and use the provided credentials in your Render environment variables.
+
+---
+
 ## API Overview
 
 | Method | Endpoint | Description |
@@ -174,7 +217,6 @@ The ATS score is calculated out of 100 across 4 sections:
 
 ## Future Work
 
-- [ ] Deploy to production
 - [ ] Cover letter generator using the same JD input
 - [ ] Resume templates — switch between layouts before export
 - [ ] Job tracker — save jobs you've applied to with the generated resume
