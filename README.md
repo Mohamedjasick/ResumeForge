@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)]()
 
-**Built by [Mohamedjasick](https://github.com/YOUR_GITHUB_USERNAME)**
+**Built by [Mohamedjasick](https://github.com/Mohamedjasick)**
 
 ---
 
